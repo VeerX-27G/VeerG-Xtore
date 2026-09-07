@@ -1,0 +1,6 @@
+__pycache__/
+items.db
+.venv
+.env
+.idea
+static/img

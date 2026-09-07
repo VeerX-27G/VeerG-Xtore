@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Bootstrap 5 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+<link rel="stylesheet" href="css/style.css">
+<title>Your cart — Xtore</title>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a href="index.html" class="wordmark">VeerG <span class="badge-xtore">Xtore</span></a>
+    <nav class="main-nav">
+      <a href="index.html" data-nav-link>Shop</a>
+      <a href="orders.html" data-nav-link>Orders</a>
+      <span class="nav-user" data-user-slot></span>
+    </nav>
+    <a href="cart.html" class="nav-cart">
+      Cart <span class="count" data-cart-count>0</span>
+    </a>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1 class="page-title">Your cart</h1>
+  <p class="page-sub" id="cart-sub">Review your items before checkout.</p>
+
+  <div class="cart-layout" id="cart-layout">
+    <!-- filled by script -->
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>VeerG's Xtore — a class project storefront.</span>
+    <span>Secure payments powered by Stripe.</span>
+  </div>
+</footer>
+
+<!-- Bootstrap 5 Bundle JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+<script src="js/app.js"></script>
+<script>
+  const layout = document.getElementById("cart-layout");
+  const sub = document.getElementById("cart-sub");
+
+  function render() {
+    if (!Store.getUser()) {
+      window.location.href = "login.html";
+      return;
+    }
+    const lines = Store.cartLines();
+    const totals = Store.cartTotals();
+
+    if (lines.length === 0) {
+      sub.textContent = "Your cart is empty.";
+      layout.innerHTML = `
+        <div class="empty-state" style="grid-column: 1 / -1;">
+          <h3>Nothing in your Xtore cart yet</h3>
+          <p>Items you add from the shop will show up here.</p>
+          <a href="index.html" class="btn">Back to shop</a>
+        </div>
+      `;
+      return;
+    }
+
+    sub.textContent = `${lines.reduce((a, l) => a + l.qty, 0)} item(s) in your cart.`;
+
+    layout.innerHTML = `
+      <div>
+        ${lines.map(l => {
+          const atMaxStock = l.qty >= l.stock;
+          return `
+            <div class="line-item">
+              <div class="thumb">${l.imageUrl ? `<img src="${l.imageUrl}" alt="${l.name}">` : l.id}</div>
+              <div>
+                <div class="name">${l.name}</div>
+                <div class="unit">${money(l.price)} each &middot; <span style="font-size:12px; color:${l.stock <= 5 ? '#DC2626' : 'var(--ink-light)'}; font-weight:600;">${l.stock} in stock</span></div>
+                <button class="remove-link" data-remove="${l.id}">Remove</button>
+              </div>
+              <div class="qty-control">
+                <button data-dec="${l.id}" title="Decrease quantity">&minus;</button>
+                <span title="${l.qty} in cart">${l.qty}</span>
+                <button data-inc="${l.id}" ${atMaxStock ? 'style="opacity:0.4; cursor:not-allowed;"' : ''} title="${atMaxStock ? 'Maximum stock reached' : 'Increase quantity'}">+</button>
+              </div>
+              <div class="line-total">${money(l.price * l.qty)}</div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+      <div class="summary-box">
+        <h3>Order summary</h3>
+        <div class="summary-row"><span>Subtotal</span><span>${money(totals.subtotal)}</span></div>
+        <div class="summary-row"><span>Shipping</span><span>${totals.shipping === 0 ? "Free" : money(totals.shipping)}</span></div>
+        <div class="summary-row"><span>Tax (6%)</span><span>${money(totals.tax)}</span></div>
+        <div class="summary-row total"><span>Total</span><span>${money(totals.total)}</span></div>
+        <a href="checkout.html" class="btn btn-block" style="margin-top:18px; text-align:center;">Proceed to checkout</a>
+        <a href="index.html" class="btn btn-quiet btn-block" style="margin-top:10px; text-align:center;">Keep browsing</a>
+      </div>
+    `;
+
+    layout.querySelectorAll("[data-inc]").forEach(b => b.addEventListener("click", () => {
+      const l = lines.find(x => x.id === b.dataset.inc);
+      if (l.qty >= l.stock) {
+        showToast(`Cannot add more. Only ${l.stock} in stock.`);
+        return;
+      }
+      const res = Store.setQty(l.id, l.qty + 1);
+      render();
+      renderHeaderState();
+      if (res.capped) {
+        showToast(`Stock limit reached (${l.stock} max).`);
+      }
+    }));
+
+    layout.querySelectorAll("[data-dec]").forEach(b => b.addEventListener("click", () => {
+      const l = lines.find(x => x.id === b.dataset.dec);
+      Store.setQty(l.id, l.qty - 1);
+      render();
+      renderHeaderState();
+    }));
+
+    layout.querySelectorAll("[data-remove]").forEach(b => b.addEventListener("click", () => {
+      Store.removeFromCart(b.dataset.remove);
+      render();
+      renderHeaderState();
+      showToast("Item removed");
+    }));
+  }
+
+  (async () => {
+    try {
+      await Store.loadProducts();
+      render();
+    } catch (error) {
+      sub.textContent = "Your cart could not be loaded.";
+      layout.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;"><h3>Catalog unavailable</h3><p>Please try again shortly.</p></div>`;
+    }
+  })();
+</script>
+
+</body>
+</html>

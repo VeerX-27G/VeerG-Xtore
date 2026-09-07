@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Bootstrap 5 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+<link rel="stylesheet" href="css/style.css">
+<title>Checkout — Xtore</title>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a href="index.html" class="wordmark">VeerG <span class="badge-xtore">Xtore</span></a>
+    <nav class="main-nav">
+      <a href="index.html" data-nav-link>Shop</a>
+      <a href="orders.html" data-nav-link>Orders</a>
+      <span class="nav-user" data-user-slot></span>
+    </nav>
+    <a href="cart.html" class="nav-cart">
+      Cart <span class="count" data-cart-count>0</span>
+    </a>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1 class="page-title">Checkout</h1>
+  <p class="page-sub">Complete your shipping details below. You will be redirected to the secure Stripe Checkout portal to complete payment.</p>
+
+  <div class="form-layout" id="checkout-layout">
+    <form id="checkout-form" class="form-card" novalidate>
+      <fieldset>
+        <legend>Shipping Information</legend>
+        <div class="field">
+          <label for="full-name">Full name</label>
+          <input id="full-name" name="fullName" placeholder="e.g. Gurveer Singh" required>
+          <div class="error-msg">Enter the recipient's name.</div>
+        </div>
+        <div class="field">
+          <label for="address">Street address</label>
+          <input id="address" name="address" placeholder="123 Market St, Suite 400" required>
+          <div class="error-msg">Enter a delivery street address.</div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="city">City</label>
+            <input id="city" name="city" placeholder="Toronto" required>
+            <div class="error-msg">City is required.</div>
+          </div>
+          <div class="field">
+            <label for="postal">Postal / ZIP code</label>
+            <input id="postal" name="postal" placeholder="M5V 2T6" required>
+            <div class="error-msg">Postal code is required.</div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Payment Method</legend>
+        <div class="p-3 mb-3 border rounded bg-light" style="border-color: rgba(10, 126, 140, 0.3) !important;">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="payMethod" id="payMethodStripe" value="stripe" checked>
+            <label class="form-check-label fw-bold text-dark" for="payMethodStripe">
+              Stripe Checkout (Credit/Debit Card, Apple Pay, Link)
+            </label>
+          </div>
+        </div>
+        <div class="demo-note">
+          🔒 Secure encryption powered by Stripe. You can use standard Stripe test card numbers (e.g. <code>4242 4242 4242 4242</code>) in test mode.
+        </div>
+      </fieldset>
+
+      <button type="submit" id="submit-btn" class="btn btn-block">Pay with Stripe</button>
+    </form>
+
+    <aside class="order-summary-mini" id="order-summary-mini"></aside>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>VeerG's Xtore — a class project storefront.</span>
+    <span>Secure payments powered by Stripe.</span>
+  </div>
+</footer>
+
+<!-- Bootstrap 5 Bundle JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+<script src="js/app.js"></script>
+<script>
+  const summaryEl = document.getElementById("order-summary-mini");
+  const form = document.getElementById("checkout-form");
+  const submitBtn = document.getElementById("submit-btn");
+
+  async function initialiseCheckout() {
+    if (!Store.getUser()) {
+      window.location.href = "login.html";
+      return;
+    }
+
+    try {
+      await Store.loadProducts();
+    } catch (error) {
+      document.getElementById("checkout-layout").innerHTML = `<div class="empty-state"><h3>Catalog unavailable</h3><p>Please try again shortly.</p></div>`;
+      return;
+    }
+
+    const lines = Store.cartLines();
+    const totals = Store.cartTotals();
+
+    if (lines.length === 0) {
+      document.getElementById("checkout-layout").innerHTML = `
+        <div class="empty-state">
+          <h3>Your cart is empty</h3>
+          <p>Add something from the shop before checking out.</p>
+          <a href="index.html" class="btn">Back to shop</a>
+        </div>`;
+      return;
+    }
+
+    summaryEl.innerHTML = `
+      <h3>Order summary</h3>
+      ${lines.map(l => `<div class="mini-line"><span>${l.name} &times; ${l.qty}</span><span class="n">${money(l.price * l.qty)}</span></div>`).join("")}
+      <div class="mini-line" style="border-top:1px dashed var(--border-teal); padding-top:12px; margin-top:6px;"><span>Subtotal</span><span class="n">${money(totals.subtotal)}</span></div>
+      <div class="mini-line"><span>Shipping</span><span class="n">${totals.shipping === 0 ? "Free" : money(totals.shipping)}</span></div>
+      <div class="mini-line"><span>Tax (6%)</span><span class="n">${money(totals.tax)}</span></div>
+      <div class="mini-line" style="font-size:17px; font-weight:800; color:var(--teal-900); border-top:1.5px solid var(--border-teal); padding-top:12px; margin-top:6px;"><span>Total</span><span class="n">${money(totals.total)}</span></div>
+    `;
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      let valid = true;
+
+      form.querySelectorAll("input[required]").forEach(input => {
+        const errorEl = input.parentElement.querySelector(".error-msg");
+        if (!input.value.trim()) {
+          input.classList.add("field-error");
+          if (errorEl) errorEl.classList.add("show");
+          valid = false;
+        } else {
+          input.classList.remove("field-error");
+          if (errorEl) errorEl.classList.remove("show");
+        }
+      });
+
+      if (!valid) return;
+
+      const user = Store.getUser();
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      const shippingDestination = `${form.fullName.value.trim()}, ${form.address.value.trim()}, ${form.city.value.trim()} ${form.postal.value.trim()}`;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Connecting to Stripe Checkout...";
+
+      try {
+        const data = await Store.createStripeCheckout(shippingDestination);
+        if (data.checkout_url) {
+          window.location.href = data.checkout_url;
+        } else {
+          throw new Error("No checkout URL returned from server.");
+        }
+      } catch (error) {
+        alert(error.message || "Failed to initiate Stripe Checkout session.");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Pay with Stripe";
+      }
+    });
+  }
+
+  initialiseCheckout();
+</script>
+
+</body>
+</html>

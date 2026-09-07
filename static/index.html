@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Bootstrap 5 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+<link rel="stylesheet" href="css/style.css">
+<title>VeerG's Xtore</title>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a href="index.html" class="wordmark">VeerG <span class="badge-xtore">Xtore</span></a>
+    <nav class="main-nav">
+      <a href="index.html" data-nav-link class="active">Shop</a>
+      <a href="orders.html" data-nav-link>Orders</a>
+      <span class="nav-user" data-user-slot></span>
+    </nav>
+    <a href="cart.html" class="nav-cart">
+      Cart <span class="count" data-cart-count>0</span>
+    </a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <h1>Desk goods, plainly made.</h1>
+      <p>Curated notebooks, pens, and paper stock for people who still write things down. Every item ships from a single small run — once it's gone, it's re-ordered, not restocked overnight.</p>
+      <a href="#catalog" class="btn-hero">Browse the catalog &darr;</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat">
+        <span class="num" id="stat-count">2</span>
+        <span class="label">items currently listed</span>
+      </div>
+      <div class="stat">
+        <span class="num">Live DB</span>
+        <span class="label">verified catalog source</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<main class="wrap" id="catalog">
+  <div class="section-head">
+    <h2>Catalog</h2>
+    <span class="tally" id="tally-label">2 entries</span>
+  </div>
+
+  <div class="grid" id="product-grid"></div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>VeerG's Xtore — a class project storefront.</span>
+    <span>Secure payments powered by Stripe.</span>
+  </div>
+</footer>
+
+<!-- Bootstrap 5 Bundle JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+<script src="js/app.js"></script>
+<script>
+  const grid = document.getElementById("product-grid");
+  const tally = document.getElementById("tally-label");
+
+  function renderGrid() {
+    const items = Store.products;
+
+    tally.textContent = `${items.length} ${items.length === 1 ? "entry" : "entries"}`;
+
+    grid.innerHTML = items.map((p, i) => {
+      const isOutOfStock = p.stock <= 0;
+      const isLowStock = p.stock > 0 && p.stock <= 8;
+      const stockText = isOutOfStock ? "Out of stock" : (isLowStock ? `Only ${p.stock} left` : `${p.stock} in stock`);
+
+      return `
+        <div class="card">
+          <span class="entry-no">No. ${p.id}</span>
+          <div class="card-media">${p.imageUrl ? `<img src="${p.imageUrl}" alt="${p.name}">` : p.name}</div>
+          <h3>${p.name}</h3>
+          <p class="desc">${p.desc}</p>
+          <div class="meta-row">
+            <span class="price">${money(p.price)}</span>
+            <span class="stock-tag ${isLowStock || isOutOfStock ? "low" : ""}">${stockText}</span>
+          </div>
+          ${Store.getUser() ? (
+            isOutOfStock
+              ? `<button class="btn btn-disabled" disabled>Out of stock</button>`
+              : `<button class="btn" data-add="${p.id}">Add to cart</button>`
+          ) : ""}
+        </div>
+      `;
+    }).join("");
+
+    grid.querySelectorAll("[data-add]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const result = Store.addToCart(btn.dataset.add, 1);
+        renderHeaderState();
+        showToast(result.message || "Added to cart");
+      });
+    });
+  }
+
+  (async () => {
+    try {
+      await Store.loadProducts();
+      document.getElementById("stat-count").textContent = Store.products.length;
+      renderGrid();
+    } catch (error) {
+      tally.textContent = "Catalog unavailable";
+      grid.innerHTML = `<div class="empty-state"><h3>Catalog unavailable</h3><p>Please try again shortly.</p></div>`;
+    }
+  })();
+</script>
+
+</body>
+</html>
