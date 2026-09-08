@@ -5,9 +5,11 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if SQLALCHEMY_DATABASE_URL:
-    # Heroku outputs "postgres://", but SQLAlchemy requires "postgresql://"
+    # Heroku may provide either legacy postgres:// or standard postgresql:// URLs.
     if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
-        SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+    elif SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
+        SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
     
     engine = create_engine(SQLALCHEMY_DATABASE_URL)
 else:

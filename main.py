@@ -8,7 +8,7 @@ import secrets
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from database import Base, SessionLocal, engine
@@ -20,12 +20,12 @@ load_dotenv()
 
 Base.metadata.create_all(bind=engine)
 with engine.begin() as connection:
-    # This line of code retrieves the column names from the 'items' table.
-    columns = {row[1] for row in connection.execute(text("PRAGMA table_info(items)"))}
-    # This line of code checks if the 'is_active' column exists in the 'items' table. If not, it adds it.
+    columns = {column["name"] for column in inspect(engine).get_columns("items")}
     if "is_active" not in columns:
-        # ALTER TABLE is a SQL command used to modify the structure of an existing table.
-        connection.execute(text("ALTER TABLE items ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
+        default_value = "1" if engine.dialect.name == "sqlite" else "TRUE"
+        connection.execute(text(
+            f"ALTER TABLE items ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT {default_value}"
+        ))
 
 app = FastAPI(title="VeerG's Xtore API")
 

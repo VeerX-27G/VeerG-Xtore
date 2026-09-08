@@ -7,4 +7,8 @@ dependencies = [
 	"pydantic",
 	"sqlalchemy",
 	"uvicorn[standard]",
+	"python-dotenv",
+	"stripe",
+	"psycopg[binary]",
+	"requests",
 ]
